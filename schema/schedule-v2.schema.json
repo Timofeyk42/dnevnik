@@ -1,0 +1,275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Дневник — расписание с чередующимися неделями v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "name",
+    "timeZone",
+    "weeks"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2,
+      "type": "integer"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+    },
+    "timeZone": {
+      "const": "Europe/Moscow"
+    },
+    "weeks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/week"
+      }
+    }
+  },
+  "$defs": {
+    "time": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "day": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "day",
+        "lessons"
+      ],
+      "properties": {
+        "day": {
+          "enum": [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday"
+          ]
+        },
+        "lessons": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/lesson"
+          }
+        }
+      }
+    },
+    "lesson": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "subject": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+        },
+        "startTime": {
+          "$ref": "#/$defs/time"
+        },
+        "endTime": {
+          "$ref": "#/$defs/time"
+        },
+        "room": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+        },
+        "teacher": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+        },
+        "variants": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/variant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "subject"
+          ],
+          "properties": {
+            "subject": {
+              "type": "string"
+            },
+            "variants": {
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "required": [
+            "variants"
+          ],
+          "properties": {
+            "subject": {
+              "type": "null"
+            },
+            "room": {
+              "type": "null"
+            },
+            "teacher": {
+              "type": "null"
+            },
+            "variants": {
+              "minItems": 2,
+              "contains": {
+                "type": "object"
+              },
+              "minContains": 1
+            }
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "then": {
+            "properties": {
+              "endTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "endTime"
+            ]
+          },
+          "if": {
+            "properties": {
+              "startTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "startTime"
+            ]
+          }
+        },
+        {
+          "then": {
+            "properties": {
+              "startTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "startTime"
+            ]
+          },
+          "if": {
+            "properties": {
+              "endTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "endTime"
+            ]
+          }
+        }
+      ]
+    },
+    "week": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "days"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "days": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "items": {
+            "$ref": "#/$defs/day"
+          }
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject"
+      ],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+        },
+        "room": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+        },
+        "teacher": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]).*\\S.*$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "name": "Учебный пример",
+  "timeZone": "Europe/Moscow",
+  "days": [
+    {
+      "day": "monday",
+      "lessons": [
+        { "number": 0, "subject": "ЗС", "startTime": null, "endTime": null, "room": null, "teacher": null },
+        { "number": 1, "subject": "Математика", "startTime": "08:30", "endTime": "09:15", "room": "204", "teacher": null },
+        { "number": 2, "subject": "Математика", "startTime": "09:25", "endTime": "10:10", "room": "204", "teacher": null }
+      ]
+    },
+    { "day": "saturday", "lessons": [] }
+  ]
+}

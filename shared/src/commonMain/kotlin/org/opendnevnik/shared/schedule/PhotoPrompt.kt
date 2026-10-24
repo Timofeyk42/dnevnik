@@ -1,0 +1,38 @@
+package org.opendnevnik.shared.schedule
+
+/** Short copyable prompt; example is validated against the actual importer. */
+object PhotoPrompt {
+    /** A complete importable example, also used by the UI independently of the prompt wording. */
+    val exampleJson = """
+        {
+          "schemaVersion": 2,
+          "name": "Моё расписание",
+          "timeZone": "Europe/Moscow",
+          "weeks": [{"number": 1, "days": [
+            {
+              "day": "monday",
+              "lessons": [
+                {"number": 1, "subject": "Математика", "room": "204"},
+                {"number": 2, "subject": "Математика", "room": "204"},
+                {"number": 3, "variants": [{"subject": "Физика ЗС", "room": "100"}, {"subject": "Информатика", "room": "101"}]}
+              ]
+            }
+          ]}]
+        }
+    """.trimIndent()
+
+    val text = """
+        Перепиши расписание с фото в JSON для приложения «Дневник».
+        Сохрани обе недели (блоки 1 и 2) отдельно в weeks. Если неделя одна, используй number: 1.
+
+        Перенеси предметы, номера уроков и кабинеты. Склей переносы в словах; сокращения сохрани.
+        Ячейку на несколько уроков повтори для каждого номера: например, предмет на 3–4 — два урока с номерами 3 и 4.
+        Параллельные столбцы одного урока сохрани в variants слева направо, пустой столбец — null. Общую ячейку запиши одним subject.
+        ЗС — обычный урок. Названия вроде «Физика ЗС» сохраняй целиком.
+        Если времени на фото нет, не добавляй его. Если есть — startTime и endTime в формате HH:mm.
+        Нечитаемое не угадывай — уточни. Пустой день: lessons=[].
+
+        Дни: monday, tuesday, wednesday, thursday, friday, saturday, sunday.
+        Верни только JSON по этому примеру, без Markdown и дополнительных полей. Пример показывает формат, а не уроки с фото:
+    """.trimIndent() + "\n" + exampleJson
+}
