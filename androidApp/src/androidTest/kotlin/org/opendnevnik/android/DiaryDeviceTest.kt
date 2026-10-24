@@ -15,6 +15,12 @@ import org.opendnevnik.shared.schedule.ScheduleJson
 import org.opendnevnik.shared.schedule.PhotoPrompt
 import org.junit.Assert.*
 import java.util.UUID
+import android.net.Uri
+import org.opendnevnik.shared.planner.*
+import org.opendnevnik.android.ui.calendarIntent
+import android.provider.CalendarContract
+import java.io.File
+import java.time.Instant
 
 /** Run on a disposable .debug installation; all records below are synthetic. */
 @RunWith(AndroidJUnit4::class)
@@ -54,5 +60,31 @@ class DiaryDeviceTest {
         assertEquals(scheduleBefore, ScheduleFileStore(compose.activity).read())
         assertTrue(PlannerFileStore(compose.activity).read().events.any { it.title == eventTitle })
         assertTrue(ScheduleJson.parse(PhotoPrompt.exampleJson) is ImportResult.Valid)
+    }
+
+    @Test fun plannerBackupRejectsCorruptionAndCalendarIntentUsesCorrectTimes() {
+        compose.waitUntil(15_000) { !model().state.value.working && model().state.value.plannerReady }
+        val event = PlannerEvent(UUID.randomUUID().toString(), "Backup test", "2026-10-26")
+        compose.runOnUiThread { model().saveEvent(event) }
+        compose.waitUntil(10_000) { !model().state.value.working && model().state.value.planner.events.any { it.id == event.id } }
+        val before = PlannerFileStore(compose.activity).read()
+        val backup = File(compose.activity.cacheDir, "backup-${event.id}.json")
+        compose.runOnUiThread { model().exportPlanner(Uri.fromFile(backup)) }
+        compose.waitUntil(10_000) { !model().state.value.working }
+        assertEquals(before, PlannerJson.decode(backup.readText()))
+        val broken = File(compose.activity.cacheDir, "broken-${event.id}.json").apply { writeText("{broken") }
+        compose.runOnUiThread { model().importPlanner(Uri.fromFile(broken)) }
+        compose.waitUntil(10_000) { !model().state.value.working }
+        assertEquals(before, PlannerFileStore(compose.activity).read())
+        compose.runOnUiThread { model().importPlanner(Uri.fromFile(backup)) }
+        compose.waitUntil(10_000) { !model().state.value.working }
+        assertEquals(before, PlannerFileStore(compose.activity).read())
+
+        val allDay = calendarIntent(event)
+        assertTrue(allDay.getBooleanExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, false))
+        assertEquals(Instant.parse("2026-10-26T00:00:00Z").toEpochMilli(), allDay.getLongExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, -1))
+        assertEquals(86_400_000L, allDay.getLongExtra(CalendarContract.EXTRA_EVENT_END_TIME, -1) - allDay.getLongExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, -1))
+        val timed = calendarIntent(event.copy(startTime = "10:00", endTime = "11:00"))
+        assertEquals(Instant.parse("2026-10-26T07:00:00Z").toEpochMilli(), timed.getLongExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, -1))
     }
 }

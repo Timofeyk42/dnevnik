@@ -36,6 +36,8 @@ JDK 17, Android SDK 36; версии закреплены. SDK 37 может с�
 ```
 
 APK: androidApp/build/outputs/apk/debug/androidApp-debug.apk.
+Debug устанавливается как отдельное приложение «Дневник (тест)» с applicationId
+org.opendnevnik.android.debug. Это позволяет сохранить исходную установленную версию.
 На Windows — gradlew.bat и ASCII-путь checkout/build. Junction может разрешаться
 Android Gradle обратно в исходный кириллический путь. APK не устанавливается
 автоматически. Release signing и публикация в магазинах не настроены.
@@ -47,6 +49,11 @@ Android Gradle обратно в исходный кириллический п�
 Используются нативные компоненты, оформление зависит от iOS/SDK.
 На Windows iOS не собирается; добавлен macOS CI. ИИ для iOS не планируется.
 Статус и ограничения: [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md).
+
+Проверки Pixel и независимое ревью: [REVIEW.md](docs/REVIEW.md).
+Устройственные тесты запускаются командой `./gradlew :androidApp:connectedDebugAndroidTest`
+на подключённом телефоне с разрешённой USB-отладкой. Используйте отдельную `.debug`
+установку с синтетическими данными: тест импорта заменяет её расписание и добавляет события.
 
 ## Приватность
 
