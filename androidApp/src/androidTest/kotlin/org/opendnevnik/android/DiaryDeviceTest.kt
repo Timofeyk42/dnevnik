@@ -14,6 +14,7 @@ import org.opendnevnik.shared.schedule.ImportResult
 import org.opendnevnik.shared.schedule.ScheduleJson
 import org.opendnevnik.shared.schedule.PhotoPrompt
 import org.junit.Assert.*
+import java.util.UUID
 
 /** Run on a disposable .debug installation; all records below are synthetic. */
 @RunWith(AndroidJUnit4::class)
@@ -22,13 +23,14 @@ class DiaryDeviceTest {
     private fun model() = ViewModelProvider(compose.activity)[DiaryViewModel::class.java]
 
     @Test fun importCalendarInvalidInputAndActivityRecreation() {
+        val eventTitle = "UI test ${UUID.randomUUID().toString().take(8)}"
         compose.waitUntil(15_000) { !model().state.value.working }
         compose.onNodeWithContentDescription("Загрузить расписание").performClick()
         compose.onNodeWithText("Вставить пример").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Проверить и посмотреть"))
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Проверить и посмотреть"))
         compose.onNodeWithText("Проверить и посмотреть").performClick()
         compose.waitUntil(10_000) { model().state.value.preview != null }
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Сохранить расписание"))
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Сохранить расписание"))
         compose.onNodeWithText("Сохранить расписание").performClick()
         // Existing synthetic test schedules may require the normal replacement confirmation.
         if (compose.onAllNodesWithText("Заменить").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithText("Заменить").performClick()
@@ -38,19 +40,19 @@ class DiaryDeviceTest {
         compose.onAllNodesWithText("Математика").assertCountEquals(2)
         compose.onNodeWithText("Календарь").performClick()
         compose.onNodeWithText("Добавить").performClick()
-        compose.onNode(hasSetTextAction() and hasText("Название")).performTextInput("Синтетическое событие UI")
+        compose.onNode(hasSetTextAction() and hasText("Название")).performTextInput(eventTitle)
         compose.onNodeWithText("Сохранить", useUnmergedTree = true).performClick()
-        compose.waitUntil(10_000) { model().state.value.planner.events.any { it.title == "Синтетическое событие UI" } && !model().state.value.working }
-        compose.onNodeWithText("Синтетическое событие UI").assertIsDisplayed()
+        compose.waitUntil(10_000) { model().state.value.planner.events.any { it.title == eventTitle } && !model().state.value.working }
+        compose.onNodeWithText(eventTitle).assertIsDisplayed()
         compose.activityRule.scenario.recreate()
         compose.waitUntil(15_000) { !model().state.value.working }
-        compose.onNodeWithText("Синтетическое событие UI").assertIsDisplayed()
+        compose.onNodeWithText(eventTitle).assertIsDisplayed()
 
         val scheduleBefore = ScheduleFileStore(compose.activity).read()
         compose.runOnUiThread { model().editSource("{broken"); model().previewImport() }
         compose.waitUntil(10_000) { !model().state.value.working && model().state.value.issues.isNotEmpty() }
         assertEquals(scheduleBefore, ScheduleFileStore(compose.activity).read())
-        assertTrue(PlannerFileStore(compose.activity).read().events.any { it.title == "Синтетическое событие UI" })
+        assertTrue(PlannerFileStore(compose.activity).read().events.any { it.title == eventTitle })
         assertTrue(ScheduleJson.parse(PhotoPrompt.exampleJson) is ImportResult.Valid)
     }
 }

@@ -95,7 +95,7 @@ struct ImportView: View {
             Form {
                 Button("Скопировать инструкцию для фото") { UIPasteboard.general.string = NativeDiaryBridge().photoPrompt() }
                 Button("Выбрать JSON-файл") { choosingFile = true }.disabled(checking || store.busy)
-                TextEditor(text: $source).frame(minHeight: 180).disabled(checking).onChange(of: source) { _, _ in preview = nil }
+                TextEditor(text: $source).frame(minHeight: 180).disabled(checking || store.busy).onChange(of: source) { _, _ in preview = nil }
                 Button("Проверить JSON") {
                     checking = true
                     let raw = source
@@ -106,7 +106,7 @@ struct ImportView: View {
                             DispatchQueue.main.async { normalized = text; preview = value; error = nil; checking = false }
                         } catch { DispatchQueue.main.async { self.error = "Проверьте JSON, номера, предметы и время"; checking = false } }
                     }
-                }.disabled(checking || source.utf8.count > 262144)
+                }.disabled(checking || store.busy || source.utf8.count > 262144)
                 if let error { Text(error).foregroundStyle(.red) }
                 if let preview {
                     Section(preview.name) {
@@ -117,7 +117,7 @@ struct ImportView: View {
                                 ForEach(day.lessons) { Text("\($0.number). \($0.title)") }
                             }
                         }
-                        Button("Сохранить расписание") { confirming = true }
+                        Button("Сохранить расписание") { confirming = true }.disabled(checking || store.busy)
                     }
                 }
             }

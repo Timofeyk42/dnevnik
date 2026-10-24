@@ -37,6 +37,7 @@ import org.opendnevnik.android.presentation.DiaryViewModel
 import org.opendnevnik.shared.schedule.*
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.flow.first
 
 private val dayNames = listOf(R.string.monday, R.string.tuesday, R.string.wednesday, R.string.thursday, R.string.friday, R.string.saturday, R.string.sunday)
 private val shortDays = listOf(R.string.mon, R.string.tue, R.string.wed, R.string.thu, R.string.fri, R.string.sat, R.string.sun)
@@ -55,14 +56,19 @@ fun DiaryApp(model: DiaryViewModel) {
     val openDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(model::readDocument) }
     val exportDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let(model::exportDocument) }
     BackHandler(enabled = importing || editing) { importing = false; editing = false }
-    LaunchedEffect(state.detail) {
-        state.detail?.let { snackbar.showSnackbar(it); model.dismissDetail() }
+    LaunchedEffect(model, snackbar) {
+        while (true) {
+            val detail = model.state.first { it.detail != null }.detail ?: continue
+            model.dismissDetail()
+            snackbar.showSnackbar(detail)
+        }
     }
-    LaunchedEffect(state.message) {
-        state.message?.let { message ->
+    LaunchedEffect(model, snackbar, context) {
+        while (true) {
+            val message = model.state.first { it.message != null }.message ?: continue
+            model.dismissMessage()
             if (message == R.string.import_success) { importing = false; selectedTab = 0 }
             snackbar.showSnackbar(context.getString(message))
-            model.dismissMessage()
         }
     }
     Scaffold(
