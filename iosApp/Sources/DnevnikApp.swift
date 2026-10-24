@@ -89,10 +89,12 @@ struct ImportView: View {
     @State private var error: String?
     @State private var checking = false
     @State private var confirming = false
+    @State private var choosingFile = false
     var body: some View {
         NavigationStack {
             Form {
                 Button("Скопировать инструкцию для фото") { UIPasteboard.general.string = NativeDiaryBridge().photoPrompt() }
+                Button("Выбрать JSON-файл") { choosingFile = true }.disabled(checking || store.busy)
                 TextEditor(text: $source).frame(minHeight: 180).disabled(checking).onChange(of: source) { _, _ in preview = nil }
                 Button("Проверить JSON") {
                     checking = true
@@ -121,6 +123,9 @@ struct ImportView: View {
             }
             .navigationTitle("Импорт JSON")
             .toolbar { Button("Закрыть") { dismiss() } }
+            .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.json, .plainText]) { result in
+                if case let .success(url) = result { store.readImportFile(url, planner: false) { source = $0; preview = nil } }
+            }
             .confirmationDialog("Заменить текущее расписание?", isPresented: $confirming, titleVisibility: .visible) {
                 Button("Заменить") { store.importSchedule(normalized) { dismiss() } }
             }
@@ -189,6 +194,11 @@ struct EventEditor: View {
 
 struct SettingsView: View {
     @EnvironmentObject var store: DiaryStore
+    @State private var exportDocument: JSONDocument?
+    @State private var exporting = false
+    @State private var exportName = "dnevnik"
+    @State private var restoring = false
+    @State private var confirmRestore = false
     var body: some View {
         NavigationStack {
             Form {
@@ -202,8 +212,39 @@ struct SettingsView: View {
                     Link("Открыть МЭШ", destination: URL(string: "https://school.mos.ru/")!)
                     Text("Оценки не редактируются. ИИ в iOS не входит.").font(.caption)
                 }
+                Section("Файлы и резервная копия") {
+                    Button("Экспорт расписания") {
+                        store.prepareExport(planner: false) { exportDocument = JSONDocument(text: $0); exportName = "schedule"; exporting = true }
+                    }.disabled(store.busy || store.schedule == nil)
+                    Button("Копия календаря и настроек") {
+                        store.prepareExport(planner: true) { exportDocument = JSONDocument(text: $0); exportName = "dnevnik-planner"; exporting = true }
+                    }.disabled(store.busy || !store.plannerReady)
+                    Button("Восстановить календарь и настройки") { confirmRestore = true }.disabled(store.busy)
+                    Text("Копии содержат личные записи. Выбирайте доверенное хранилище.").font(.caption)
+                }
                 Section("Приватность") { Text("Локальное хранение. Нет аналитики и рекламы. Независимый проект, не официальное приложение МЭШ.") }
             }.navigationTitle("Настройки")
+            .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json, defaultFilename: exportName) { result in
+                if case .failure = result { store.error = "Не удалось экспортировать файл" }
+            }
+            .confirmationDialog("Заменить календарь и настройки?", isPresented: $confirmRestore, titleVisibility: .visible) {
+                Button("Выбрать копию и заменить") { restoring = true }
+            } message: { Text("Сначала сохраните важные записи. Расписание останется без изменений.") }
+            .fileImporter(isPresented: $restoring, allowedContentTypes: [.json, .plainText]) { result in
+                if case let .success(url) = result { store.readImportFile(url, planner: true) { store.restorePlanner($0) } }
+            }
         }
     }
+}
+
+struct JSONDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    var text: String
+    init(text: String) { self.text = text }
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents, data.count <= 2_097_152,
+              let value = String(data: data, encoding: .utf8) else { throw CocoaError(.fileReadCorruptFile) }
+        text = value
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: Data(text.utf8)) }
 }

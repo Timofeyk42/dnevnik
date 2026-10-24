@@ -97,4 +97,54 @@ import DnevnikShared
         savePlanner(next, completion: completion)
     }
     func removeEvent(_ id: String) { var next = planner; next.events.removeAll { $0.id == id }; savePlanner(next) }
+
+    func readImportFile(_ url: URL, planner: Bool, completion: @escaping (String) -> Void) {
+        guard !busy else { return }; busy = true; error = nil
+        worker.async {
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let maxBytes = planner ? 2_097_152 : 262_144
+                let handle = try FileHandle(forReadingFrom: url)
+                defer { try? handle.close() }
+                var data = Data()
+                while data.count <= maxBytes {
+                    let part = try handle.read(upToCount: min(8192, maxBytes + 1 - data.count)) ?? Data()
+                    if part.isEmpty { break }
+                    data.append(part)
+                }
+                guard data.count <= maxBytes, let text = String(data: data, encoding: .utf8) else { throw CocoaError(.fileReadCorruptFile) }
+                DispatchQueue.main.async { self.busy = false; completion(text) }
+            } catch { DispatchQueue.main.async { self.busy = false; self.error = "Не удалось прочитать UTF-8 JSON или файл слишком велик." } }
+        }
+    }
+
+    func restorePlanner(_ raw: String) {
+        guard !busy else { return }; busy = true; error = nil
+        worker.async {
+            do {
+                let text = try NativeDiaryBridge().normalizePlanner(text: raw)
+                let decoded = try JSONDecoder().decode(Planner.self, from: Data(text.utf8))
+                try Data(text.utf8).write(to: Self.directory().appendingPathComponent("planner.json"), options: [.atomic, .completeFileProtection])
+                DispatchQueue.main.async { self.planner = decoded; self.plannerReady = true; self.busy = false }
+            } catch { DispatchQueue.main.async { self.busy = false; self.error = "Неверная копия. Прежний календарь не заменён." } }
+        }
+    }
+
+    func prepareExport(planner: Bool, completion: @escaping (String) -> Void) {
+        guard !busy, planner ? plannerReady : schedule != nil else { return }
+        let scheduleSnapshot = schedule
+        let plannerSnapshot = self.planner
+        busy = true
+        worker.async {
+            do {
+                let bridge = NativeDiaryBridge()
+                let text: String
+                if planner { text = try bridge.normalizePlanner(text: String(decoding: JSONEncoder().encode(plannerSnapshot), as: UTF8.self)) }
+                else if let scheduleSnapshot { text = try bridge.normalizeSchedule(text: String(decoding: JSONEncoder().encode(scheduleSnapshot), as: UTF8.self)) }
+                else { throw CocoaError(.fileReadNoSuchFile) }
+                DispatchQueue.main.async { self.busy = false; completion(text) }
+            } catch { DispatchQueue.main.async { self.busy = false; self.error = "Не удалось подготовить экспорт." } }
+        }
+    }
 }

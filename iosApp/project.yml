@@ -1,5 +1,7 @@
 name: Dnevnik
 options:
+  projectFormat: xcode16_0
+  xcodeVersion: '16.0'
   bundleIdPrefix: org.opendnevnik
   deploymentTarget:
     iOS: '17.0'
