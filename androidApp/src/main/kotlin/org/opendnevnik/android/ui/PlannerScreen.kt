@@ -35,6 +35,7 @@ fun PlannerScreen(state: DiaryState, model: DiaryViewModel, tasksOnly: Boolean =
     var showAll by rememberSaveable { mutableStateOf(tasksOnly) }
     var pickDate by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var creating by rememberSaveable { mutableStateOf(false) }
     var deletingId by rememberSaveable { mutableStateOf<String?>(null) }
     val canEdit = !state.working && state.plannerReady
     val events = state.planner.events.filter {
@@ -48,7 +49,10 @@ fun PlannerScreen(state: DiaryState, model: DiaryViewModel, tasksOnly: Boolean =
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { pickDate = true }, modifier = Modifier.weight(1f)) { Text(selectedDate) }
-                Button(onClick = { editingId = "new" }, enabled = canEdit) { Text("Добавить") }
+                Button(onClick = {
+                    creating = true
+                    editingId = generateSequence { UUID.randomUUID().toString() }.first { candidate -> state.planner.events.none { it.id == candidate } }
+                }, enabled = canEdit) { Text("Добавить") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(!showAll, { showAll = false }, label = { Text("На дату") })
@@ -73,7 +77,7 @@ fun PlannerScreen(state: DiaryState, model: DiaryViewModel, tasksOnly: Boolean =
                         Text(if (event.done) "Выполнено" else "Не выполнено", Modifier.padding(top = 12.dp))
                     }
                     Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        TextButton({ editingId = event.id }, enabled = canEdit) { Text("Изменить") }
+                        TextButton({ creating = false; editingId = event.id }, enabled = canEdit) { Text("Изменить") }
                         TextButton({
                             try {
                                 context.startActivity(calendarIntent(event))
@@ -93,8 +97,15 @@ fun PlannerScreen(state: DiaryState, model: DiaryViewModel, tasksOnly: Boolean =
             TextButton({ picker.selectedDateMillis?.let { selectedDate = Instant.ofEpochMilli(it).atOffset(ZoneOffset.UTC).toLocalDate().toString() }; pickDate = false }) { Text("Выбрать") }
         }) { DatePicker(picker) }
     }
-    editingId?.let { id ->
-        val event = remember(id) { state.planner.events.find { it.id == id } ?: PlannerEvent(UUID.randomUUID().toString(), "", selectedDate, if (tasksOnly) EventKind.HOMEWORK else EventKind.EVENT) }
+    if (state.plannerReady) editingId?.let { id ->
+        val event = remember(id, creating) {
+            if (creating) PlannerEvent(id, "", selectedDate, if (tasksOnly) EventKind.HOMEWORK else EventKind.EVENT)
+            else state.planner.events.find { it.id == id }
+        }
+        if (event == null) {
+            LaunchedEffect(id) { editingId = null }
+            return@let
+        }
         key(id) { EventDialog(event, canEdit, { editingId = null }, { model.saveEvent(it) { editingId = null } }) }
     }
     deletingId?.let { id ->

@@ -51,6 +51,7 @@ Android Gradle обратно в исходный кириллический п�
 Статус и ограничения: [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md).
 
 Проверки Pixel и независимое ревью: [REVIEW.md](docs/REVIEW.md).
+[Mac, Codex и iPhone Simulator](docs/MAC_IOS_SETUP.md) — перенос работы и ручная проверка iOS.
 Устройственные тесты запускаются командой `./gradlew :androidApp:connectedDebugAndroidTest`
 на подключённом телефоне с разрешённой USB-отладкой. Используйте отдельную `.debug`
 установку с синтетическими данными: тест импорта заменяет её расписание и добавляет события.

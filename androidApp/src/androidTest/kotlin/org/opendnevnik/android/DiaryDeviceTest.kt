@@ -21,6 +21,7 @@ import org.opendnevnik.android.ui.calendarIntent
 import android.provider.CalendarContract
 import java.io.File
 import java.time.Instant
+import androidx.compose.ui.semantics.SemanticsProperties
 
 /** Run on a disposable .debug installation; all records below are synthetic. */
 @RunWith(AndroidJUnit4::class)
@@ -64,7 +65,7 @@ class DiaryDeviceTest {
 
     @Test fun plannerBackupRejectsCorruptionAndCalendarIntentUsesCorrectTimes() {
         compose.waitUntil(15_000) { !model().state.value.working && model().state.value.plannerReady }
-        val event = PlannerEvent(UUID.randomUUID().toString(), "Backup test", "2026-10-26")
+        val event = PlannerEvent("new", "Backup test", "2026-10-26")
         compose.runOnUiThread { model().saveEvent(event) }
         compose.waitUntil(10_000) { !model().state.value.working && model().state.value.planner.events.any { it.id == event.id } }
         val before = PlannerFileStore(compose.activity).read()
@@ -79,6 +80,18 @@ class DiaryDeviceTest {
         compose.runOnUiThread { model().importPlanner(Uri.fromFile(backup)) }
         compose.waitUntil(10_000) { !model().state.value.working }
         assertEquals(before, PlannerFileStore(compose.activity).read())
+
+        // A valid imported ID must never double as the UI's create-mode sentinel.
+        compose.onNodeWithText("Календарь").performClick()
+        compose.onNodeWithText("Добавить").performClick()
+        val titleField = compose.onNode(hasSetTextAction() and hasText("Название"))
+        assertEquals("", titleField.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        val addedTitle = "Created ${UUID.randomUUID().toString().take(8)}"
+        titleField.performTextInput(addedTitle)
+        compose.onNodeWithText("Сохранить", useUnmergedTree = true).performClick()
+        compose.waitUntil(10_000) { !model().state.value.working && model().state.value.planner.events.any { it.title == addedTitle } }
+        assertEquals(before.events.size + 1, model().state.value.planner.events.size)
+        assertEquals("Backup test", model().state.value.planner.events.single { it.id == "new" }.title)
 
         val allDay = calendarIntent(event)
         assertTrue(allDay.getBooleanExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, false))
