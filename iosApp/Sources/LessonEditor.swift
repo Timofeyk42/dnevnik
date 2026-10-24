@@ -53,6 +53,6 @@ struct LessonEditor: View {
         if !isNew { weeks[wi].days[di].lessons.removeAll { $0.number == originalNumber } }
         if !remove { weeks[wi].days[di].lessons.append(lesson) }
         if schedule.schemaVersion == 1 { schedule.days = weeks[0].days } else { schedule.weeks = weeks }
-        store.saveSchedule(schedule); dismiss()
+        store.saveSchedule(schedule) { dismiss() }
     }
 }

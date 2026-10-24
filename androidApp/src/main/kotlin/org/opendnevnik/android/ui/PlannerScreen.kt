@@ -95,7 +95,7 @@ fun PlannerScreen(state: DiaryState, model: DiaryViewModel, tasksOnly: Boolean =
     }
     editingId?.let { id ->
         val event = remember(id) { state.planner.events.find { it.id == id } ?: PlannerEvent(UUID.randomUUID().toString(), "", selectedDate, if (tasksOnly) EventKind.HOMEWORK else EventKind.EVENT) }
-        key(id) { EventDialog(event, canEdit, { editingId = null }, { model.saveEvent(it); editingId = null }) }
+        key(id) { EventDialog(event, canEdit, { editingId = null }, { model.saveEvent(it) { editingId = null } }) }
     }
     deletingId?.let { id ->
         AlertDialog(onDismissRequest = { deletingId = null }, title = { Text("Удалить событие?") }, text = { Text("Удалится только локальная запись. Экспортированная копия в другом календаре останется.") }, confirmButton = {
@@ -112,7 +112,14 @@ private fun EventDialog(initial: PlannerEvent, enabled: Boolean, dismiss: () -> 
     var end by rememberSaveable { mutableStateOf(initial.endTime.orEmpty()) }
     var notes by rememberSaveable { mutableStateOf(initial.notes) }
     var kind by rememberSaveable { mutableStateOf(initial.kind) }
-    val event = initial.copy(title = title.trim(), date = date, startTime = start.ifBlank { null }, endTime = end.ifBlank { null }, notes = notes, kind = kind)
+    var resetOverrides by rememberSaveable { mutableStateOf(false) }
+    val event = initial.copy(title = title.trim(), date = date, startTime = start.ifBlank { null }, endTime = end.ifBlank { null }, notes = notes, kind = kind,
+        dateOverridden = initial.source?.let { if (resetOverrides) date != it.date else if (date != initial.date) date != it.date else initial.dateOverridden } ?: false,
+        titleOverridden = initial.source?.let { if (resetOverrides) title.trim() != it.title else if (title.trim() != initial.title) title.trim() != it.title else initial.titleOverridden } ?: false,
+        timeOverridden = initial.source?.let {
+            if (start != initial.startTime.orEmpty() || end != initial.endTime.orEmpty()) start != it.startTime.orEmpty() || end != it.endTime.orEmpty() else initial.timeOverridden
+        } ?: false,
+        kindOverridden = initial.source?.let { if (kind != initial.kind) kind != it.kind else initial.kindOverridden } ?: false)
     val error = PlannerRules.validate(event)
     AlertDialog(onDismissRequest = dismiss, title = { Text("Событие") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,7 +134,7 @@ private fun EventDialog(initial: PlannerEvent, enabled: Boolean, dismiss: () -> 
             OutlinedTextField(notes, { notes = it.take(4000) }, label = { Text("Заметка") }, maxLines = 5)
             initial.source?.let { source ->
                 Text("Дата МЭШ: ${source.date}. Здесь меняется только ваш план.")
-                TextButton({ date = source.date; title = source.title }) { Text("Вернуть дату и название МЭШ") }
+                TextButton({ date = source.date; title = source.title; resetOverrides = true }) { Text("Вернуть дату и название МЭШ") }
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }

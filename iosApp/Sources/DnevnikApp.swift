@@ -65,6 +65,9 @@ struct ScheduleView: View {
                 Text("Локальный шаблон. ЗС — обычный урок. Недели не привязаны к датам автоматически.").font(.caption)
             }
             .disabled(store.busy)
+            .onChange(of: store.schedule?.effectiveWeeks.map(\.number) ?? []) { _, numbers in
+                if !numbers.contains(week) { week = numbers.first ?? 1 }
+            }
             .navigationTitle("Расписание")
             .toolbar { Button("Импорт") { importing = true } }
             .sheet(isPresented: $importing) { ImportView() }
@@ -90,7 +93,7 @@ struct ImportView: View {
         NavigationStack {
             Form {
                 Button("Скопировать инструкцию для фото") { UIPasteboard.general.string = NativeDiaryBridge().photoPrompt() }
-                TextEditor(text: $source).frame(minHeight: 180).onChange(of: source) { _, _ in preview = nil }
+                TextEditor(text: $source).frame(minHeight: 180).disabled(checking).onChange(of: source) { _, _ in preview = nil }
                 Button("Проверить JSON") {
                     checking = true
                     let raw = source
@@ -119,7 +122,7 @@ struct ImportView: View {
             .navigationTitle("Импорт JSON")
             .toolbar { Button("Закрыть") { dismiss() } }
             .confirmationDialog("Заменить текущее расписание?", isPresented: $confirming, titleVisibility: .visible) {
-                Button("Заменить") { store.importSchedule(normalized); dismiss() }
+                Button("Заменить") { store.importSchedule(normalized) { dismiss() } }
             }
         }
     }
@@ -172,13 +175,13 @@ struct EventEditor: View {
                 if event.kind == "HOMEWORK" { Toggle("Выполнено", isOn: $event.done) }
                 if let source = event.source {
                     Text("Школьная дата: \(source.date). Изменения здесь личные.")
-                    Button("Вернуть дату и название МЭШ") { event.date = source.date; event.title = source.title }
+                    Button("Вернуть дату и название МЭШ") { event.date = source.date; event.title = source.title; event.dateOverridden = false; event.titleOverridden = false }
                 }
             }
             .navigationTitle("Событие")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Сохранить") { store.putEvent(event); dismiss() }.disabled(store.busy || event.title.isEmpty) }
+                ToolbarItem(placement: .confirmationAction) { Button("Сохранить") { store.putEvent(event) { dismiss() } }.disabled(store.busy || event.title.isEmpty) }
             }
         }
     }

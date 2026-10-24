@@ -157,7 +157,7 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissDetail() { mutableState.update { it.copy(detail = null) } }
     fun report(text: String) { mutableState.update { it.copy(detail = text) } }
 
-    fun saveSchedule(schedule: Schedule) {
+    fun saveSchedule(schedule: Schedule, onSaved: () -> Unit = {}) {
         if (state.value.working) return
         val result = ScheduleJson.parse(ScheduleJson.encode(schedule))
         if (result is ImportResult.Invalid) { report(result.issues.joinToString("\n") { it.message }); return }
@@ -167,6 +167,7 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 withContext(Dispatchers.IO) { store.save(result.schedule) }
                 mutableState.update { it.copy(schedule = result.schedule, working = false, detail = "Расписание сохранено") }
+                onSaved()
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 mutableState.update { it.copy(working = false, message = R.string.save_failed) }
@@ -174,25 +175,26 @@ class DiaryViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun saveEvent(event: PlannerEvent) = changePlanner { PlannerRules.put(it, event) }
+    fun saveEvent(event: PlannerEvent, onSaved: () -> Unit = {}) = changePlanner(onSaved) { PlannerRules.put(it, event) }
     fun removeEvent(id: String) = changePlanner { it.copy(events = it.events.filterNot { e -> e.id == id }) }
     fun preferences(preferences: Preferences) = changePlanner { it.copy(preferences = preferences) }
     fun clearPlanner() = changePlanner { PlannerData(preferences = it.preferences) }
 
-    private fun changePlanner(transform: (PlannerData) -> PlannerData) {
+    private fun changePlanner(onSaved: () -> Unit = {}, transform: (PlannerData) -> PlannerData) {
         if (state.value.working || !state.value.plannerReady) return
         val next = try { transform(state.value.planner) } catch (_: IllegalArgumentException) {
             report("Проверьте поля события и лимит 1000 событий"); return
         }
-        persistPlanner(next)
+        persistPlanner(next, onSaved)
     }
 
-    private fun persistPlanner(next: PlannerData) {
+    private fun persistPlanner(next: PlannerData, onSaved: () -> Unit) {
         mutableState.update { it.copy(working = true) }
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) { plannerStore.save(next) }
                 mutableState.update { it.copy(planner = next, plannerReady = true, working = false) }
+                onSaved()
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 mutableState.update { it.copy(working = false, detail = "Не удалось сохранить планировщик. Прежние данные сохранены.") }

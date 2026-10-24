@@ -2,6 +2,8 @@ package org.opendnevnik.shared.planner
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.opendnevnik.shared.schedule.*
 
 @Serializable enum class EventKind { EVENT, TEST, HOMEWORK, LESSON }
@@ -14,7 +16,10 @@ import org.opendnevnik.shared.schedule.*
 )
 
 /** A remote key must include the account/profile namespace; never match by title. */
-@Serializable data class EventSource(val key: String, val date: String, val title: String)
+@Serializable data class EventSource(
+    val key: String, val date: String, val title: String,
+    val startTime: String? = null, val endTime: String? = null, val kind: EventKind? = null,
+)
 @Serializable data class PlannerEvent(
     val id: String,
     val title: String,
@@ -26,6 +31,10 @@ import org.opendnevnik.shared.schedule.*
     val done: Boolean = false,
     val source: EventSource? = null,
     val sourceMissing: Boolean = false,
+    val dateOverridden: Boolean = false,
+    val titleOverridden: Boolean = false,
+    val timeOverridden: Boolean = false,
+    val kindOverridden: Boolean = false,
 )
 @Serializable data class PlannerData(
     val version: Int = 1,
@@ -53,6 +62,7 @@ object PlannerRules {
         event.startTime != null && (!Regex("(?:[01][0-9]|2[0-3]):[0-5][0-9]").matches(event.startTime) ||
             !Regex("(?:[01][0-9]|2[0-3]):[0-5][0-9]").matches(event.endTime.orEmpty()) || event.startTime >= event.endTime.orEmpty()) -> "Время: ЧЧ:ММ, окончание позже начала"
         event.source?.let { it.key.isBlank() || it.key.length > 500 || !validDate(it.date) || it.title.isBlank() || it.title.length > 120 } == true -> "Некорректные сведения об источнике"
+        event.source?.let { validate(PlannerEvent("source", it.title, it.date, it.kind ?: event.kind, it.startTime, it.endTime)) != null } == true -> "Некорректное время источника"
         else -> null
     }
     fun validate(data: PlannerData): String? = when {
@@ -69,7 +79,7 @@ object PlannerRules {
         return next
     }
     fun resetToSource(event: PlannerEvent): PlannerEvent = event.source?.let {
-        event.copy(date = it.date, title = it.title)
+        event.copy(date = it.date, title = it.title, dateOverridden = false, titleOverridden = false)
     } ?: event
 
     /** Only call with a complete, validated source snapshot for this namespace, never on network failure. */
@@ -77,15 +87,30 @@ object PlannerRules {
         require(namespace.isNotBlank() && namespace.endsWith(":"))
         require(incoming.all { it.source?.key?.startsWith(namespace) == true && validate(it) == null })
         require(incoming.map { it.source!!.key }.distinct().size == incoming.size)
+        require(incoming.map { it.id }.distinct().size == incoming.size)
+        require(incoming.none { remote -> data.events.any { it.id == remote.id && it.source?.key != remote.source?.key } }) {
+            "Source ID collides with an existing event"
+        }
         val keys = incoming.map { it.source!!.key }.toSet()
         var result = data.copy(events = data.events.map {
             if (it.source?.key?.startsWith(namespace) == true) it.copy(sourceMissing = it.source.key !in keys) else it
         })
-        incoming.forEach { remote ->
+        incoming.forEach { item ->
+            val remote = item.copy(source = item.source!!.copy(date = item.date, title = item.title,
+                startTime = item.startTime, endTime = item.endTime, kind = item.kind),
+                dateOverridden = false, titleOverridden = false, timeOverridden = false, kindOverridden = false)
             val old = result.events.find { it.source?.key == remote.source!!.key }
+            val keepTime = old?.let { it.timeOverridden || it.startTime != it.source?.startTime || it.endTime != it.source?.endTime } == true
+            val keepKind = old?.let { it.kindOverridden || (it.source?.kind != null && it.kind != it.source.kind) } == true
             val merged = if (old == null) remote else old.copy(
-                title = if (old.title == old.source!!.title) remote.title else old.title,
-                date = if (old.date == old.source!!.date) remote.date else old.date,
+                title = if (old.titleOverridden || old.title != old.source!!.title) old.title else remote.title,
+                date = if (old.dateOverridden || old.date != old.source!!.date) old.date else remote.date,
+                dateOverridden = old.dateOverridden || old.date != old.source!!.date,
+                titleOverridden = old.titleOverridden || old.title != old.source!!.title,
+                startTime = if (keepTime) old.startTime else remote.startTime,
+                endTime = if (keepTime) old.endTime else remote.endTime,
+                kind = if (keepKind) old.kind else remote.kind,
+                timeOverridden = keepTime, kindOverridden = keepKind,
                 source = remote.source, sourceMissing = false,
             )
             result = put(result, merged)
@@ -104,6 +129,9 @@ object PlannerJson {
     fun decode(text: String): PlannerData {
         require(text.encodeToByteArray().size <= MAX_BYTES)
         require(ScheduleJson.preflight(text) == null)
+        val root = json.parseToJsonElement(text) as? JsonObject ?: throw IllegalArgumentException("Expected object")
+        require(root.keys.containsAll(listOf("version", "events", "preferences")))
+        require((root["version"] as? JsonPrimitive)?.isString == false)
         return json.decodeFromString<PlannerData>(text).also { require(PlannerRules.validate(it) == null) }
     }
 }

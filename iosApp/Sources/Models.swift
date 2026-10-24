@@ -22,7 +22,7 @@ struct Schedule: Codable {
     var weeks: [ScheduleWeek]?
     var effectiveWeeks: [ScheduleWeek] { schemaVersion == 1 ? [ScheduleWeek(number: 1, days: days ?? [])] : weeks ?? [] }
 }
-struct EventSource: Codable { var key: String; var date: String; var title: String }
+struct EventSource: Codable { var key: String; var date: String; var title: String; var startTime: String?; var endTime: String?; var kind: String? }
 struct PlannerEvent: Codable, Identifiable {
     var id: String = UUID().uuidString
     var title: String = ""
@@ -34,6 +34,10 @@ struct PlannerEvent: Codable, Identifiable {
     var done: Bool = false
     var source: EventSource? = nil
     var sourceMissing: Bool = false
+    var dateOverridden: Bool = false
+    var titleOverridden: Bool = false
+    var timeOverridden: Bool = false
+    var kindOverridden: Bool = false
     static var today: String {
         let format = DateFormatter(); format.dateFormat = "yyyy-MM-dd"
         format.locale = Locale(identifier: "en_US_POSIX"); format.timeZone = TimeZone(identifier: "Europe/Moscow")

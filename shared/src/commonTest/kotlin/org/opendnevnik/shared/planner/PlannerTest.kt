@@ -41,6 +41,33 @@ class PlannerTest {
         assertFails { PlannerJson.decode("{\"version\":99}") }
         assertFails { PlannerJson.encode(data.copy(events = listOf(remote(), remote()))) }
         assertFails { PlannerJson.decode(" ".repeat(PlannerJson.MAX_BYTES + 1)) }
+        assertFails { PlannerJson.decode("{}") }
+        assertFails { PlannerJson.decode("{\"version\":1,\"version\":1,\"events\":[],\"preferences\":{}}") }
+        assertFails { PlannerJson.decode("[".repeat(100) + "]".repeat(100)) }
+    }
+    @Test fun sourceCannotOverwriteUnrelatedLocalEventWithSameId() {
+        val local = PlannerEvent("remote-1", "Моя запись", "2026-10-26")
+        assertFails { PlannerRules.reconcile(PlannerData(events = listOf(local)), "account:child:", listOf(remote())) }
+    }
+    @Test fun personalDateRemainsPinnedWhenSourceTemporarilyCoincides() {
+        val personal = remote().copy(date = "2026-10-28")
+        val sameDate = PlannerRules.reconcile(PlannerData(events = listOf(personal)), "account:child:", listOf(remote("2026-10-28")))
+        val later = PlannerRules.reconcile(sameDate, "account:child:", listOf(remote("2026-10-29")))
+        assertEquals("2026-10-28", later.events.single().date)
+        assertTrue(later.events.single().dateOverridden)
+        assertFalse(PlannerRules.resetToSource(later.events.single()).dateOverridden)
+    }
+    @Test fun remoteTimeAndKindRefreshUnlessPersonallyEdited() {
+        val before = remote().copy(startTime = "09:00", endTime = "10:00")
+        val first = PlannerRules.reconcile(PlannerData(), "account:child:", listOf(before))
+        val after = before.copy(startTime = "11:00", endTime = "12:00", kind = EventKind.EVENT)
+        val updated = PlannerRules.reconcile(first, "account:child:", listOf(after)).events.single()
+        assertEquals("11:00", updated.startTime)
+        assertEquals(EventKind.EVENT, updated.kind)
+        val personal = first.copy(events = listOf(first.events.single().copy(startTime = "13:00", endTime = "14:00")))
+        val kept = PlannerRules.reconcile(personal, "account:child:", listOf(after)).events.single()
+        assertEquals("13:00", kept.startTime)
+        assertEquals("11:00", kept.source?.startTime)
     }
     @Test fun editPreservesOtherWeekRepeatedSubjectsAndNullColumn() {
         val lesson = Lesson(1, variants = listOf(LessonVariant("ЗС"), null))

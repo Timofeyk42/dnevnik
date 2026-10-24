@@ -60,14 +60,14 @@ fun ScheduleEditorScreen(state: DiaryState, model: DiaryViewModel) {
         var name by rememberSaveable { mutableStateOf(schedule.name) }
         AlertDialog(onDismissRequest = { rename = false }, title = { Text("Название расписания") }, text = {
             OutlinedTextField(name, { name = it.take(80) }, singleLine = true)
-        }, confirmButton = { TextButton({ model.saveSchedule(schedule.copy(name = name.trim())); rename = false }, enabled = !state.working && name.isNotBlank()) { Text("Сохранить") } }, dismissButton = { TextButton({ rename = false }) { Text("Отмена") } })
+        }, confirmButton = { TextButton({ model.saveSchedule(schedule.copy(name = name.trim())) { rename = false } }, enabled = !state.working && name.isNotBlank()) { Text("Сохранить") } }, dismissButton = { TextButton({ rename = false }) { Text("Отмена") } })
     }
     editNumber?.let { number ->
         val initial = lessons.find { it.number == number }
         key(week.number, day, number) {
             LessonDialog(initial, schedule.schemaVersion == 2, !state.working, lessons.map { it.number }, { editNumber = null }) { lesson ->
                 when (val result = ScheduleEditor.put(schedule, week.number, day, initial?.number, lesson)) {
-                    is ImportResult.Valid -> { model.saveSchedule(result.schedule); editNumber = null }
+                    is ImportResult.Valid -> model.saveSchedule(result.schedule) { editNumber = null }
                     is ImportResult.Invalid -> model.report(result.issues.joinToString("\n") { it.message })
                 }
             }
