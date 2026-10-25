@@ -41,7 +41,7 @@ import kotlinx.coroutines.flow.first
 
 private val dayNames = listOf(R.string.monday, R.string.tuesday, R.string.wednesday, R.string.thursday, R.string.friday, R.string.saturday, R.string.sunday)
 private val shortDays = listOf(R.string.mon, R.string.tue, R.string.wed, R.string.thu, R.string.fri, R.string.sat, R.string.sun)
-private val tabs = listOf(R.string.schedule, R.string.calendar, R.string.homework, R.string.marks, R.string.settings)
+private val tabs = listOf(R.string.schedule, R.string.homework, R.string.marks, R.string.calendar, R.string.settings)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,9 +101,9 @@ fun DiaryApp(model: DiaryViewModel) {
                     openDocument.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
                 })
                 selectedTab == 0 -> ScheduleScreen(state) { importing = true }
-                selectedTab == 1 -> PlannerScreen(state, model)
-                selectedTab == 2 -> PlannerScreen(state, model, tasksOnly = true)
-                selectedTab == 3 -> MarksScreen()
+                selectedTab == 1 -> PlannerScreen(state, model, tasksOnly = true)
+                selectedTab == 2 -> MarksScreen()
+                selectedTab == 3 -> PlannerScreen(state, model)
                 else -> SettingsScreen(state, model, onImport = { importing = true }, onExport = { exportDocument.launch("schedule.json") })
             } }
             if (state.working) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
@@ -113,7 +113,7 @@ fun DiaryApp(model: DiaryViewModel) {
 
 @Composable
 private fun DiaryNavigation(selected: Int, onSelect: (Int) -> Unit) {
-    val icons = listOf(Icons.Outlined.Schedule, Icons.Outlined.CalendarMonth, Icons.AutoMirrored.Outlined.Assignment, Icons.Outlined.BarChart, Icons.Outlined.Tune)
+    val icons = listOf(Icons.Outlined.Schedule, Icons.AutoMirrored.Outlined.Assignment, Icons.Outlined.BarChart, Icons.Outlined.CalendarMonth, Icons.Outlined.Tune)
     NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         tabs.forEachIndexed { index, title ->
             NavigationBarItem(
